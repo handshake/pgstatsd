@@ -46,7 +46,8 @@ func (db *Database) GetStats() []StatRow {
 }
 
 func main() {
-	db := DBInit("postgres://postgres:postgres@localhost/postgres")
+	config := ReadConfig("./conf.json")
+	db := DBInit(config.ConnectionURL)
 	defer db.con.Close()
 	stats := db.GetStats()
 	for _, s := range stats {
