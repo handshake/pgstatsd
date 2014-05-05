@@ -36,7 +36,12 @@ type StatRow struct {
 
 type SizeStat struct {
 	Relation string `db:"relation"`
-	Bytes    int    `db:"bytes"`
+	Bytes    int64  `db:"bytes"`
+}
+
+func (db *Database) GetBiggestRelation() int64 {
+	stats := db.GetSizeStats(1)
+	return stats[0].Bytes
 }
 
 func (db *Database) GetSizeStats(limit int) []SizeStat {
@@ -69,30 +74,36 @@ func (db *Database) GetStatementStats() []StatRow {
 }
 
 func main() {
+	// read our configuration
 	config := ReadConfig("./conf.json")
+
+	// connect to the database
 	db := DBInit(config.PG.ConnectionString)
 	defer db.con.Close()
-	statementStats := db.GetStatementStats()
-	for _, s := range statementStats {
-		log.Printf("%#v", s)
-	}
 
-	sizeStats := db.GetSizeStats(50)
-	for _, s := range sizeStats {
-		log.Printf("%#v", s)
-	}
-
-	client, err := statsd.New(config.ST.ConnectionString, config.ST.Prefix)
+	// connect to statsd
+	statsd, err := statsd.New(config.ST.ConnectionString, config.ST.Prefix)
 	// handle any errors
 	if err != nil {
 		log.Fatal(err)
 	}
 	// make sure to clean up
-	defer client.Close()
+	defer statsd.Close()
 
-	err = client.Inc("stat1", 42, 1.0)
+	err = statsd.Gauge("biggest_relation_bytes", db.GetBiggestRelation(), 1.0)
 	if err != nil {
 		log.Printf("Error sending metric: %+v", err)
 	}
+	/*
+		statementStats := db.GetStatementStats()
+		for _, s := range statementStats {
+			log.Printf("%#v", s)
+		}
+
+		sizeStats := db.GetSizeStats(50)
+		for _, s := range sizeStats {
+			log.Printf("%#v", s)
+		}
+	*/
 
 }
