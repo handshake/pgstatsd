@@ -5,12 +5,20 @@ package main
 
 import (
 	"database/sql"
+	"flag"
 	"log"
 
 	"github.com/cactus/go-statsd-client/statsd"
 	"github.com/jmoiron/sqlx"
 	_ "github.com/lib/pq" // underscore means import for side-effects only, brings no symbols into scope
 )
+
+// Path to config file
+var configPath string
+
+func init() {
+	flag.StringVar(&configPath, "config", "/etc/pgstatsd/conf.json", "path to config.json")
+}
 
 type Database struct {
 	con *sqlx.DB
@@ -74,8 +82,10 @@ func (db *Database) GetStatementStats() []StatRow {
 }
 
 func main() {
+	flag.Parse()
+
 	// read our configuration
-	config := ReadConfig("./conf.json")
+	config := ReadConfig(configPath)
 
 	// connect to the database
 	db := DBInit(config.PG.ConnectionString)
