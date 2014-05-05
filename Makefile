@@ -1,9 +1,5 @@
-PREFIX=/usr/local
-DESTDIR=
 GOOS=
 GOARCH=
-BINDIR=${PREFIX}/bin
-CONFDIR=/etc/pgstatsd
 
 SRC_DIR=$(wildcard *.go)
 SRC=$(wildcard *.go)
