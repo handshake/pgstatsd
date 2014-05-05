@@ -6,8 +6,18 @@ import (
 	"os"
 )
 
+type PostgresConfig struct {
+	ConnectionString string `json:"connection_string"`
+}
+
+type StatsdConfig struct {
+	ConnectionString string `json:"connection_string"`
+	Prefix           string `json:"prefix"`
+}
+
 type Configuration struct {
-	ConnectionURL string
+	PG PostgresConfig `json:"postgres"`
+	ST StatsdConfig   `json:"statsd"`
 }
 
 func ReadConfig(cfgPath string) Configuration {
@@ -16,13 +26,13 @@ func ReadConfig(cfgPath string) Configuration {
 	file, err := os.Open(cfgPath)
 	defer file.Close()
 	if err != nil {
-		log.Fatalf("couldn't read config from %s", cfgPath)
+		log.Fatalf("couldn't read config from %s [%s]", cfgPath, err.Error())
 	}
 
 	decoder := json.NewDecoder(file)
 	err = decoder.Decode(&config)
 	if err != nil {
-		log.Fatal("couldn't read config from conf.json")
+		log.Fatalf("couldn't read config from conf.json [%s]", err.Error())
 	}
 	return config
 }

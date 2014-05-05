@@ -7,6 +7,7 @@ import (
 	"database/sql"
 	"log"
 
+	"github.com/cactus/go-statsd-client/statsd"
 	"github.com/jmoiron/sqlx"
 	_ "github.com/lib/pq" // underscore means import for side-effects only, brings no symbols into scope
 )
@@ -33,7 +34,29 @@ type StatRow struct {
 	HitPercent    sql.NullFloat64 `db:"hit_percent"`
 }
 
-func (db *Database) GetStats() []StatRow {
+type SizeStat struct {
+	Relation string `db:"relation"`
+	Bytes    int    `db:"bytes"`
+}
+
+func (db *Database) GetSizeStats(limit int) []SizeStat {
+	// http://www.postgresql.org/docs/9.3/static/catalog-pg-class.html
+	stats := []SizeStat{}
+	err := db.con.Select(&stats, "SELECT nspname || '.' || relname AS relation, "+
+		"pg_relation_size(C.oid) AS bytes "+
+		"FROM pg_class C "+
+		"LEFT JOIN pg_namespace N ON (N.oid = C.relnamespace) "+
+		"WHERE nspname NOT IN ('pg_catalog', 'pg_toast', 'information_schema') "+
+		"ORDER BY pg_relation_size(C.oid) DESC "+
+		"LIMIT $1", limit)
+	if err != nil {
+		log.Fatal(err)
+	}
+	return stats
+}
+
+func (db *Database) GetStatementStats() []StatRow {
+	// http://www.postgresql.org/docs/9.3/static/pgstatstatements.html
 	stats := []StatRow{}
 	err := db.con.Select(&stats, "SELECT query, calls, total_time, rows, "+
 		"(total_time/calls) AS average_time, "+
@@ -47,10 +70,29 @@ func (db *Database) GetStats() []StatRow {
 
 func main() {
 	config := ReadConfig("./conf.json")
-	db := DBInit(config.ConnectionURL)
+	db := DBInit(config.PG.ConnectionString)
 	defer db.con.Close()
-	stats := db.GetStats()
-	for _, s := range stats {
-		log.Printf("hit_percent: %f average_time: %f calls: %d total_time: %f", s.HitPercent.Float64, s.AverageTimeMS/1000, s.CallCount, s.TotalTimeMS)
+	statementStats := db.GetStatementStats()
+	for _, s := range statementStats {
+		log.Printf("%#v", s)
 	}
+
+	sizeStats := db.GetSizeStats(50)
+	for _, s := range sizeStats {
+		log.Printf("%#v", s)
+	}
+
+	client, err := statsd.New(config.ST.ConnectionString, config.ST.Prefix)
+	// handle any errors
+	if err != nil {
+		log.Fatal(err)
+	}
+	// make sure to clean up
+	defer client.Close()
+
+	err = client.Inc("stat1", 42, 1.0)
+	if err != nil {
+		log.Printf("Error sending metric: %+v", err)
+	}
+
 }

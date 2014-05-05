@@ -1,3 +1,9 @@
 {
-    "ConnectionURL": "postgres://username:password@localhost/databasename"
+    "postgres": {
+        "connection_string": "postgres://username:password@host:port/databasename"
+    },
+    "statsd": {
+        "connection_string": "someserver.example.com:8125",
+        "prefix": "my.prefix"
+    }
 }
